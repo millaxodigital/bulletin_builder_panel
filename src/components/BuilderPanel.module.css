@@ -1,0 +1,199 @@
+/* BuilderPanel.module.css */
+
+/* ── Contenedor principal ── */
+.panel {
+  min-height: 100vh;
+  background: #f5f5f5;
+  font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #1a1a1a;
+}
+
+/* ── Topbar ── */
+.topbar {
+  background: #611232;
+  padding: 11px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 400;
+  box-shadow: 0 3px 14px rgba(97, 18, 50, 0.4);
+}
+
+.topbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbarLogo {
+  font-size: 20px;
+}
+
+.topbarTitulo {
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.topbarBadge {
+  font-size: 11px;
+  background: rgba(230, 209, 148, 0.15);
+  color: #e6d194;
+  border: 1px solid rgba(230, 209, 148, 0.4);
+  padding: 3px 11px;
+  border-radius: 100px;
+  font-weight: 700;
+}
+
+.btnGuardar {
+  padding: 9px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #e6d194;
+  color: #611232;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  box-shadow: 0 2px 8px rgba(165, 127, 44, 0.35);
+}
+.btnGuardar:hover {
+  opacity: 0.87;
+  transform: translateY(-1px);
+}
+
+/* ── Contenido ── */
+.contenido {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 24px 20px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Header de secciones ── */
+.seccionesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.titulo {
+  font-size: 17px;
+  font-weight: 700;
+  color: #611232;
+  margin: 0;
+}
+
+.btnAgregarSeccion {
+  padding: 9px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #611232;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  box-shadow: 0 2px 8px rgba(97, 18, 50, 0.25);
+}
+.btnAgregarSeccion:hover {
+  background: #4d0d27;
+  transform: translateY(-1px);
+}
+
+/* ── Lista de secciones ── */
+.seccionesList {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+/* ── Estado vacío ── */
+.listaVacia {
+  text-align: center;
+  padding: 40px 24px;
+  border: 2px dashed #dddbd6;
+  border-radius: 12px;
+  color: #777;
+  font-size: 14px;
+  background: #fff;
+  line-height: 2;
+}
+.listaVaciaIco {
+  font-size: 36px;
+  margin-bottom: 8px;
+}
+.listaVacia p {
+  margin: 0;
+}
+
+/* ── Bloque del JSON generado ── */
+.jsonWrap {
+  background: #fff;
+  border: 2px solid #dddbd6;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+}
+
+.jsonHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 15px;
+  background: #1a1a1a;
+  flex-wrap: wrap;
+}
+
+.jsonTitulo {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e6d194;
+  font-family: 'Courier New', monospace;
+}
+
+.jsonHint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  font-family: 'Courier New', monospace;
+  flex: 1;
+}
+
+.btnCerrarJson {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  border-radius: 6px;
+  padding: 4px 11px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.btnCerrarJson:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.jsonCode {
+  padding: 16px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #1e5b4f;
+  background: #f8f9fa;
+  overflow-x: auto;
+  white-space: pre;
+  margin: 0;
+  max-height: 500px;
+  overflow-y: auto;
+}
