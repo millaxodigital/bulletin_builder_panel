@@ -1,6 +1,3 @@
-// TitleEditor.jsx
-// Editor simplificado para títulos: toolbar (align + case) + input + preview de fuente.
-// Reutiliza AlignButtons, CaseButtons y StyleSelector sin modificarlos.
 import { useRef } from 'react'
 import AlignButtons  from './AlignButtons'
 import CaseButtons   from './CaseButtons'
@@ -8,22 +5,12 @@ import StyleSelector from './StyleSelector'
 import { applyCase } from '../../utils/caseUtils'
 import styles from './TitleEditor.module.css'
 
-const ALIGN_CLASS = {
-  left:    'text-left',
-  center:  'text-center',
-  right:   'text-right',
-  justify: 'text-justify',
-}
-
-const FONT_FAMILY = {
-  'noto-sans': '"Noto Sans", sans-serif',
-  'patria':    'Georgia, "Times New Roman", serif',
-}
+const ALIGN_CLASS = { left:'text-left', center:'text-center', right:'text-right', justify:'text-justify' }
+const FONT_FAMILY  = { 'noto-sans':'"Noto Sans", sans-serif', 'patria':'Georgia, "Times New Roman", serif' }
 
 export default function TitleEditor({ contenido, align, font, cssClases, onChange }) {
   const inputRef = useRef(null)
 
-  // Reconstruye cssClases y notifica al padre con todos los cambios
   const notificar = (extras = {}) => {
     const base     = (cssClases || '').replace(/\b(text-left|text-center|text-right|text-justify|noto-sans|patria)\b/g, '').trim()
     const fontCls  = extras.font      !== undefined ? extras.font      : (font  || '')
@@ -31,15 +18,9 @@ export default function TitleEditor({ contenido, align, font, cssClases, onChang
     const newText  = extras.contenido !== undefined ? extras.contenido : contenido
     const alignCls = ALIGN_CLASS[alignVal] || ''
     const parts    = [base, fontCls, alignCls].filter(Boolean)
-    onChange({
-      contenido:  newText,
-      align:      alignVal,
-      font:       fontCls,
-      cssClases:  [...new Set(parts)].join(' '),
-    })
+    onChange({ contenido: newText, align: alignVal, font: fontCls, cssClases: [...new Set(parts)].join(' ') })
   }
 
-  // Case sobre el <input>: transforma selección o texto completo
   const handleCase = (modo) => {
     const inp = inputRef.current
     if (!inp) return
@@ -48,16 +29,11 @@ export default function TitleEditor({ contenido, align, font, cssClases, onChang
       ? value.slice(0, s) + applyCase(value.slice(s, e), modo) + value.slice(e)
       : applyCase(value, modo)
     notificar({ contenido: resultado })
-    requestAnimationFrame(() => {
-      inp.focus()
-      inp.setSelectionRange(s, s + (e - s))
-    })
+    requestAnimationFrame(() => { inp.focus(); inp.setSelectionRange(s, s + (e - s)) })
   }
 
   return (
     <div className={styles.wrap}>
-
-      {/* ── Toolbar: Alineación + Case ── */}
       <div className={styles.toolbar}>
         <div className={styles.grupo}>
           <AlignButtons align={align} onAlign={(v) => notificar({ align: v })} />
@@ -67,28 +43,16 @@ export default function TitleEditor({ contenido, align, font, cssClases, onChang
           <CaseButtons onCase={handleCase} />
         </div>
       </div>
-
-      {/* ── Input del título ── */}
       <input
         ref={inputRef}
         type="text"
         className={styles.titleInput}
         value={contenido}
         placeholder="Escribe el título aquí..."
-        style={{
-          textAlign:  align || 'left',
-          fontFamily: FONT_FAMILY[font] || 'inherit',
-        }}
+        style={{ textAlign: align || 'left', fontFamily: FONT_FAMILY[font] || 'inherit' }}
         onChange={(e) => notificar({ contenido: e.target.value })}
       />
-
-      {/* ── Selector de fuente + preview en tiempo real ── */}
-      <StyleSelector
-        font={font}
-        onFontChange={(v) => notificar({ font: v })}
-        previewText={contenido}
-      />
-
+      <StyleSelector font={font} onFontChange={(v) => notificar({ font: v })} previewText={contenido} />
     </div>
   )
 }

@@ -1,13 +1,6 @@
-// components/Section.jsx — ACTUALIZADO v2
-// ─────────────────────────────────────────────────────────
-// Cambios respecto a v1:
-//   - El tipo 'parrafo' ahora usa TextEditor (contentEditable + toolbar)
-//     en lugar de un <textarea> simple.
-//   - El estado de cada elemento ahora incluye: html, align, font
-//     además de contenido y cssClases.
-// ─────────────────────────────────────────────────────────
 import { useState } from 'react'
-import TextEditor from './editor/TextEditor'
+import TextEditor  from './editor/TextEditor'
+import TitleEditor from './editor/TitleEditor'
 import styles from './Section.module.css'
 
 function CssTagsPreview({ valor }) {
@@ -26,7 +19,10 @@ function ElementoItem({ elemento, onUpdateElemento, onDeleteElemento }) {
     <div className={styles.elementoCard}>
       <div className={styles.elementoHead}>
         <span className={`${styles.chip} ${elemento.tipo === 'titulo' ? styles.chipTitulo : styles.chipParrafo}`}>
-          {elemento.tipo === 'titulo' ? 'H2 Título' : '¶ Párrafo'}
+          {elemento.tipo === 'titulo'
+            ? <><span className={styles.chipT}>T</span> Título</>
+            : <>¶ Párrafo</>
+          }
         </span>
         <button
           className={styles.btnEliminar}
@@ -37,31 +33,15 @@ function ElementoItem({ elemento, onUpdateElemento, onDeleteElemento }) {
 
       <div className={styles.elementoBody}>
         {elemento.tipo === 'titulo' ? (
-          <>
-            <div className={styles.campo}>
-              <label>Contenido</label>
-              <input
-                type="text"
-                value={elemento.contenido}
-                placeholder="Escribe el título aquí..."
-                onChange={(e) => onUpdateElemento(elemento.id, { contenido: e.target.value })}
-              />
-            </div>
-            <div className={styles.campo}>
-              <label>
-                Clases CSS
-                <span className={styles.labelHint}>(ej: doc-h2 text-center)</span>
-              </label>
-              <input
-                type="text"
-                value={elemento.cssClases}
-                placeholder="doc-h2 text-center"
-                onChange={(e) => onUpdateElemento(elemento.id, { cssClases: e.target.value })}
-                className={styles.inputMono}
-              />
-              <CssTagsPreview valor={elemento.cssClases} />
-            </div>
-          </>
+          <TitleEditor
+            contenido={elemento.contenido || ''}
+            align={elemento.align || 'left'}
+            font={elemento.font || ''}
+            cssClases={elemento.cssClases || 'doc-h2'}
+            onChange={({ contenido, align, font, cssClases }) =>
+              onUpdateElemento(elemento.id, { contenido, align, font, cssClases })
+            }
+          />
         ) : (
           <TextEditor
             html={elemento.html || ''}
@@ -73,7 +53,7 @@ function ElementoItem({ elemento, onUpdateElemento, onDeleteElemento }) {
                 html, align, font, cssClases,
                 contenido: new DOMParser()
                   .parseFromString(html, 'text/html')
-                  .body.textContent || ''
+                  .body.textContent || '',
               })
             }
           />
@@ -88,16 +68,16 @@ function Section({ section, sectionIndex, onUpdate, onDelete }) {
   const generarId = () => `elem_${Date.now()}_${Math.floor(Math.random() * 1000)}`
 
   const agregarElemento = (tipo) => {
-    const nuevo = {
-      id: generarId(),
-      tipo,
-      contenido: '',
-      html: '',
-      align: tipo === 'titulo' ? 'left' : 'justify',
-      font: '',
-      cssClases: tipo === 'titulo' ? 'doc-h2' : 'doc-p',
-    }
-    onUpdate(section.id, { ...section, elementos: [...section.elementos, nuevo] })
+    onUpdate(section.id, {
+      ...section,
+      elementos: [...section.elementos, {
+        id: generarId(), tipo,
+        contenido: '', html: '',
+        align: tipo === 'titulo' ? 'left' : 'justify',
+        font: '',
+        cssClases: tipo === 'titulo' ? 'doc-h2' : 'doc-p',
+      }],
+    })
   }
 
   const actualizarElemento = (elemId, cambios) => {
@@ -116,9 +96,8 @@ function Section({ section, sectionIndex, onUpdate, onDelete }) {
     })
   }
 
-  const actualizarCampoSeccion = (campo, valor) => {
+  const actualizarCampo = (campo, valor) =>
     onUpdate(section.id, { ...section, [campo]: valor })
-  }
 
   return (
     <div className={styles.seccionCard}>
@@ -143,43 +122,42 @@ function Section({ section, sectionIndex, onUpdate, onDelete }) {
               type="text"
               value={section.nombre}
               placeholder={`Sección ${sectionIndex + 1}`}
-              onChange={(e) => actualizarCampoSeccion('nombre', e.target.value)}
+              onChange={(e) => actualizarCampo('nombre', e.target.value)}
             />
           </div>
           <div className={styles.campo}>
             <label>
               Clases CSS del contenedor
-              <span className={styles.labelHint}>(ej: doc-section)</span>
+              <span className={styles.labelHint}> (ej: doc-section)</span>
             </label>
             <input
               type="text"
               value={section.cssClases}
               placeholder="doc-section"
-              onChange={(e) => actualizarCampoSeccion('cssClases', e.target.value)}
+              onChange={(e) => actualizarCampo('cssClases', e.target.value)}
               className={styles.inputMono}
             />
             <CssTagsPreview valor={section.cssClases} />
           </div>
 
           <div className={styles.elementosLista}>
-            {section.elementos.length === 0 ? (
-              <p className={styles.listaVacia}>No hay elementos. Agrega un título o párrafo.</p>
-            ) : (
-              section.elementos.map((elem) => (
-                <ElementoItem
-                  key={elem.id}
-                  elemento={elem}
-                  onUpdateElemento={actualizarElemento}
-                  onDeleteElemento={eliminarElemento}
-                />
-              ))
-            )}
+            {section.elementos.length === 0
+              ? <p className={styles.listaVacia}>No hay elementos. Agrega un título o párrafo.</p>
+              : section.elementos.map((elem) => (
+                  <ElementoItem
+                    key={elem.id}
+                    elemento={elem}
+                    onUpdateElemento={actualizarElemento}
+                    onDeleteElemento={eliminarElemento}
+                  />
+                ))
+            }
           </div>
 
           <div className={styles.botonesAgregar}>
             <span className={styles.botonesLabel}>+ Agregar:</span>
             <button className={styles.btnAgregarTitulo} onClick={() => agregarElemento('titulo')}>
-              H2 Título
+              <span className={styles.btnTIcon}>T</span> Título
             </button>
             <button className={styles.btnAgregarParrafo} onClick={() => agregarElemento('parrafo')}>
               ¶ Párrafo
