@@ -15,8 +15,8 @@ import ErrorBoundary   from './ErrorBoundary'
 import { apiRowsToSecciones } from '../utils/apiToBuilder'
 import { useGuardarBoletin }  from '../hooks/useGuardarBoletin'
 
-const TOKEN   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJtaWxsYSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc3NzUwODI0NCwiZXhwIjoxNzc3NTM3MDQ0fQ.naEZDKTjT6nvk2iLu0ZTkMbbHpNKKrtgS7S_y3YlK0k'
-const BASE_URL = 'http://localhost:3001'
+// TOKEN y BASE_URL vienen del .env a través de api.js
+import { TOKEN, BASE_URL } from '../services/api'
 
 function getSufijoDeFecha() {
   const n=new Date(); const p=x=>String(x).padStart(2,'0')
@@ -113,11 +113,20 @@ export default function EditorBoletín({ onVolver }) {
 
   // ── GUARDAR CAMBIOS ───────────────────────────────────
   const handleGuardar = useCallback(async () => {
-    const flat = builderRef.current?.buildJsonActual?.()
+    const flat     = builderRef.current?.buildJsonActual?.()
+    const imagenes = builderRef.current?.getImagenes?.() || {}
     if (!flat) return
     setGuardadoExitoso(false); setErrorGuardado('')
     try {
-      await guardar(flat, {})
+      // Inyectar el bullIdActual en cada sección antes de guardar
+      // bullIdActual es el ID que el usuario ingresó en el formulario de carga
+      if (flat.bulletin_sections) {
+        flat.bulletin_sections = flat.bulletin_sections.map(s => ({
+          ...s, bull_id: bullIdActual
+        }))
+      }
+      // Pasar bullIdActual como tercer parámetro para la carpeta de imágenes
+      await guardar(flat, imagenes, bullIdActual)
       setGuardadoExitoso(true)
       setTimeout(() => setGuardadoExitoso(false), 5000)
     } catch (err) {

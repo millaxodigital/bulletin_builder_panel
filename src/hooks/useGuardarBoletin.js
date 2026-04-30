@@ -1,17 +1,21 @@
 // ─────────────────────────────────────────────────────────────────────────
-// hooks/useGuardarBoletin.js — v6  (agrega PATCH inteligente y baja lógica)
+// hooks/useGuardarBoletin.js
 // ─────────────────────────────────────────────────────────────────────────
 //
-// CAMBIOS EN ESTA VERSIÓN:
+// CAMBIO PRINCIPAL: bullId dinámico
+//   Antes: usaba BULLETIN_ID_HARDCODE = 4 (siempre el mismo boletín)
+//   Ahora: guardar(flatJson, imagenesArchivos, bullId) recibe el ID
+//          como tercer parámetro. Si no se pasa, lanza un error claro.
 //
-//   1. PATCH inteligente: si la sección tiene _bdId, hace PATCH (actualizar),
-//      si no tiene _bdId, hace POST batch (crear nueva).
-//      ANTES: siempre hacía POST, duplicando secciones al editar un boletín.
-//      AHORA: detecta automáticamente si la sección es nueva o existente.
+//   ¿Por qué pasar bullId aquí Y en las secciones desde App.jsx?
+//   - App.jsx inyecta bull_id en cada sección (para la BD)
+//   - Este hook usa bullId para la carpeta de imágenes (POST /__upload)
+//   Los dos son necesarios: la carpeta de disco y el campo de la BD son
+//   usos distintos del mismo ID.
 //
-//   2. darDeBaja(elemsBdData, updatedBy): nueva función exportada.
-//      Recibe datos de la BD y hace PATCH con section_status = false.
-//      No necesita pasar por el proceso completo de guardado.
+// LÓGICA PATCH vs POST (igual que antes):
+//   Secciones CON section_id → PATCH /bulletin-sections
+//   Secciones SIN section_id → POST  /bulletin/sections/batch
 //
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -19,10 +23,8 @@ import { useState, useCallback } from 'react'
 import {
   registrarRecursos,
   guardarSeccionesBatch,
-  actualizarSeccion,       // ← NUEVO: PATCH /bulletin-sections
-  darDeBajaSeccion,        // ← NUEVO: baja lógica
+  actualizarSeccionesBatch,
   guardarImagenFisica,
-  BULLETIN_ID_HARDCODE,
 } from '../services/api'
 import { encodeHtml, sanitizePlain } from '../utils/htmlTokens'
 import { buildCss, encodeCssToIndex } from '../utils/cssTokens'
@@ -32,113 +34,120 @@ const RICH_TYPES        = ['p', 'ul', 'ol', 'ul-ol', 'hl', 'note']
 const PLAIN_TYPES       = ['h1', 'h2', 'h3']
 const TIPOS_CON_RECURSO = ['img', 'url', 'mail']
 
-// ── HTML_TAG_MAP ──────────────────────────────────────────────────────
-// Mapeo del tipo interno del builder al tag HTML que va a la BD.
 const HTML_TAG_MAP = {
   h1: 'h1', h2: 'h2', h3: 'h3', p: 'p',
   ul: 'ul', ol: 'ol', 'ul-ol': 'ul',
   hl:   'div',
   note: 'blockquote',
   hr:   'hr',
-  url:  'a', mail: 'a', img: 'img',
+  url:  'a',
+  mail: 'a',
+  img:  'img',
 }
 
-// ── procesarSeccion ───────────────────────────────────────────────────
-// Transforma UNA sección del buildJson al formato que espera la BD.
-// Igual que antes, pero ahora también incluye section_id si viene de BD.
+// ── procesarSeccion ────────────────────────────────────────────────────
+// Convierte una sección del buildJson al formato de la BD.
+// Si sec._bdId existe → incluye section_id → va al PATCH
+// Si no → no incluye section_id → va al POST
 function procesarSeccion(sec, resourceId, urlImagen = null) {
   const tipo  = sec._meta_type  || ''
   const align = sec._meta_align || 'left'
 
-  // Tokenizar el HTML del editor
   const htmlCrudo = sec.section_html || ''
   let   htmlToken = ''
+  if      (PLAIN_TYPES.includes(tipo)) htmlToken = sanitizePlain(htmlCrudo)
+  else if (RICH_TYPES.includes(tipo))  htmlToken = encodeHtml(htmlCrudo)
+  else                                 htmlToken = htmlCrudo
 
-  if (PLAIN_TYPES.includes(tipo)) {
-    htmlToken = sanitizePlain(htmlCrudo)
-  } else if (RICH_TYPES.includes(tipo)) {
-    htmlToken = encodeHtml(htmlCrudo)
-  } else {
-    htmlToken = htmlCrudo
+  if (RICH_TYPES.includes(tipo) || PLAIN_TYPES.includes(tipo)) {
+    devLogGroup('TOKEN', `SEG=${sec.section_segment} tipo=${tipo}`, [
+      { label: 'HTML crudo', valor: htmlCrudo },
+      { label: 'Tokens',     valor: htmlToken  },
+    ])
   }
 
-  // Codificar CSS a índices numéricos
   const cssClases  = buildCss(tipo, align, '')
   const cssIndices = encodeCssToIndex(cssClases)
   const htmlTag    = HTML_TAG_MAP[tipo] || 'div'
 
+  // El spread condicional incluye section_id solo si _bdId existe
+  // Esto es lo que separa PATCH (existente) de POST (nuevo)
   return {
-    // Si la sección tiene _bdId, incluirlo para que el PATCH funcione
-    // Si no tiene _bdId, no incluirlo (el POST no necesita section_id)
     ...(sec._bdId ? { section_id: sec._bdId } : {}),
-
     section_segment:        sec.section_segment,
     section_subsegment:     sec.section_subsegment,
-    section_subsegment_num: sec.section_subsegment_num || 0,  // ← incluir el corregido
-    bull_id:                BULLETIN_ID_HARDCODE,
-
-    resource_id:   resourceId || null,
-    section_order: sec.section_order,
-
-    // Para imágenes: section_content guarda la URL relativa del front
-    section_content: (tipo === 'img' && urlImagen) ? urlImagen : (sec.section_content || ''),
-    section_format:  htmlToken,
-    section_css:     cssIndices,
-    section_htmltag: htmlTag,
-    section_status:  true,
-    updated_by:      'milla',
-
-    // Campos temporales para debug (no van a la BD real)
-    _temp_format_crudo: htmlCrudo,
-    _temp_css_clases:   cssClases,
+    section_subsegment_num: sec.section_subsegment_num || 0,
+    bull_id:                sec.bull_id,  // ya viene inyectado desde App.jsx o EditorBoletín
+    resource_id:            resourceId || null,
+    section_order:          sec.section_order,
+    section_content:        (tipo === 'img' && urlImagen) ? urlImagen : (sec.section_content || ''),
+    section_format:         htmlToken,
+    section_css:            cssIndices,
+    section_htmltag:        htmlTag,
+    section_status:         true,
+    updated_by:             'milla',
+    _temp_format_crudo:     htmlCrudo,
+    _temp_css_clases:       cssClases,
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// useGuardarBoletin — el hook principal
+// useGuardarBoletin
 // ─────────────────────────────────────────────────────────────────────────
 export function useGuardarBoletin() {
   const [cargando,  setCargando]  = useState(false)
   const [error,     setError]     = useState(null)
   const [resultado, setResultado] = useState(null)
 
-  const guardar = useCallback(async (flatJson, imagenesArchivos = {}) => {
+  // guardar(flatJson, imagenesArchivos, bullId)
+  //   flatJson          → JSON del builder (bulletin_sections con bull_id ya inyectado)
+  //   imagenesArchivos  → mapa { nombre_archivo: objeto_File }
+  //   bullId            → ID del boletín (para la carpeta de imágenes en disco)
+  const guardar = useCallback(async (flatJson, imagenesArchivos = {}, bullId) => {
     setCargando(true)
     setError(null)
     setResultado(null)
 
+    // Validar que se pase un bullId numérico válido
+    const idNum = parseInt(bullId, 10)
+    if (!idNum || idNum <= 0) {
+      const msg = 'Debes ingresar el ID del boletín antes de guardar.'
+      setError(msg)
+      setCargando(false)
+      throw new Error(msg)
+    }
+
     try {
       const secciones = flatJson?.bulletin_sections || []
-
-      // Log del estado inicial: qué recibió el hook antes de procesar
-      devSeparator('INICIO — JSON recibido del builder (antes de procesar)')
-      devLogGroup('GUARD', 'flatJson completo recibido del BuilderPanel', [
-        { label: 'bulletin', valor: flatJson?.bulletin },
-        { label: 'Total bulletin_sections', valor: secciones.length },
-        { label: 'bulletin_sections (array completo)', valor: secciones },
-        { label: 'bulletin_path (recursos)', valor: flatJson?.bulletin_path },
-      ])
+      if (secciones.length === 0) {
+        throw new Error('No hay secciones para guardar. Agrega al menos un elemento.')
+      }
 
       // ═══════════════════════════════════════════════════════════════
-      // PASO 1: Guardar imágenes físicamente + registrar recursos
+      // PASO 1: Imágenes físicas + registrar recursos
       // ═══════════════════════════════════════════════════════════════
-      devSeparator('PASO 1 — Guardar imágenes + registrar recursos')
+      devSeparator('PASO 1 — Imágenes + Recursos')
 
       const seccionesConRecurso = secciones.filter(sec =>
         TIPOS_CON_RECURSO.includes(sec._meta_type) && sec.section_content
       )
+      devLog('GUARD', `Secciones con recurso: ${seccionesConRecurso.length}`)
 
       const urlImagenPorClave = {}
+
       for (const sec of seccionesConRecurso) {
         if (sec._meta_type === 'img') {
           const archivo = imagenesArchivos[sec.section_content]
           if (archivo) {
             try {
-              const info  = await guardarImagenFisica(archivo, BULLETIN_ID_HARDCODE)
+              // guardarImagenFisica usa el bullId para crear la carpeta correcta
+              const info  = await guardarImagenFisica(archivo, idNum)
               const clave = `${sec.section_segment}_${sec.section_subsegment}_${sec.section_order}`
               urlImagenPorClave[clave] = info.url
+              devLog('IMG', `Imagen guardada: ${info.filename} → ${info.url}`)
             } catch (imgErr) {
-              devLog('IMG', `⚠ No se pudo guardar ${sec.section_content}: ${imgErr.message}`)
+              devLog('IMG', `No se pudo guardar ${sec.section_content}: ${imgErr.message}`)
+              console.warn('[GUARD] Imagen omitida:', sec.section_content, imgErr.message)
             }
           }
         }
@@ -149,22 +158,27 @@ export function useGuardarBoletin() {
         if (sec._meta_type === 'img') {
           return { resource_desc: urlImagenPorClave[clave] || sec.section_content }
         }
+        // URL y MAIL: resource_desc SIEMPRE es la URL real
+        // section_content puede ser el anchorText, pero resource_desc es la URL
         return { resource_desc: sec.section_content }
       })
+
+      devLog('GUARD', 'Recursos a registrar:', recursosParaRegistrar)
 
       const resourceIdPorClave = {}
       if (recursosParaRegistrar.length > 0) {
         const respRecursos = await registrarRecursos(recursosParaRegistrar)
-        seccionesConRecurso.forEach((sec, i) => {
+        devLog('GUARD', 'resource_ids obtenidos:', respRecursos.inserted_ids)
+        seccionesConRecurso.forEach((sec, idx) => {
           const clave = `${sec.section_segment}_${sec.section_subsegment}_${sec.section_order}`
-          resourceIdPorClave[clave] = respRecursos.inserted_ids[i]
+          resourceIdPorClave[clave] = respRecursos.inserted_ids[idx]
         })
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // PASO 2: Tokenizar HTML y codificar CSS
+      // PASO 2: Tokenizar y codificar CSS
       // ═══════════════════════════════════════════════════════════════
-      devSeparator('PASO 2 — Tokenizar HTML y codificar CSS')
+      devSeparator('PASO 2 — Tokenizar y codificar')
 
       const seccionesProcesadas = secciones.map(sec => {
         const clave      = `${sec.section_segment}_${sec.section_subsegment}_${sec.section_order}`
@@ -174,57 +188,35 @@ export function useGuardarBoletin() {
       })
 
       // ═══════════════════════════════════════════════════════════════
-      // PASO 3: Guardar — NUEVO: PATCH para existentes, POST para nuevas
+      // PASO 3: PATCH (existentes) / POST (nuevas)
       // ═══════════════════════════════════════════════════════════════
-      devSeparator('PASO 3 — PATCH (existentes) / POST batch (nuevas)')
+      devSeparator('PASO 3 — PATCH / POST')
 
-      // Separar secciones según si ya existen en la BD o son nuevas
-      const seccionesExistentes = seccionesProcesadas.filter(s => s.section_id)
+      const seccionesExistentes = seccionesProcesadas.filter(s => !!s.section_id)
       const seccionesNuevas     = seccionesProcesadas.filter(s => !s.section_id)
 
-      devLog('GUARD', `Existentes (PATCH): ${seccionesExistentes.length}`)
-      devLog('GUARD', `Nuevas (POST batch): ${seccionesNuevas.length}`)
-
-      // Log del JSON completo que se va a enviar
-      // Esto aparece en la consola del navegador (DevTools > Console)
-      // y en la terminal donde corre "npm run dev"
-      devLogGroup('GUARD', 'JSON completo a enviar — secciones procesadas', [
-        { label: 'Total secciones', valor: seccionesProcesadas.length },
-        { label: 'Existentes (PATCH)', valor: seccionesExistentes.length },
-        { label: 'Nuevas (POST)', valor: seccionesNuevas.length },
-        { label: 'Payload PATCH (cada una se envía individual)', valor: seccionesExistentes },
-        { label: 'Payload POST batch { data: [...] }', valor: { data: seccionesNuevas } },
+      devLog('GUARD', `PATCH (con section_id): ${seccionesExistentes.length}`)
+      devLog('GUARD', `POST  (sin section_id): ${seccionesNuevas.length}`)
+      devLogGroup('GUARD', 'Payloads completos', [
+        { label: 'PATCH → { sections: [...] }', valor: { sections: seccionesExistentes } },
+        { label: 'POST  → { data: [...] }',     valor: { data: seccionesNuevas } },
       ])
 
       const resultados = []
 
-      // PATCH batch: todas las secciones existentes en UN SOLO request
-      // El endpoint espera: { "sections": [ {...}, {...}, ... ] }
-      // Un solo PATCH en lugar de N PATCHes separados.
       if (seccionesExistentes.length > 0) {
-        devLog('GUARD', `PATCH batch — ${seccionesExistentes.length} secciones en 1 request`, {
-          sections: seccionesExistentes
-        })
-
-        // actualizarSeccion ahora recibe el array completo
-        // y arma el payload { sections: [...] } internamente
-        const respPatch = await actualizarSeccion(seccionesExistentes)
-        resultados.push(respPatch)
-
-        devLog('GUARD', 'Respuesta PATCH batch recibida:', respPatch)
+        const respPatch = await actualizarSeccionesBatch(seccionesExistentes)
+        resultados.push({ tipo: 'PATCH', respuesta: respPatch })
+        devLog('GUARD', 'PATCH completado:', respPatch)
       }
 
-      // POST batch: crear las secciones nuevas
       if (seccionesNuevas.length > 0) {
-        devLog('GUARD', 'POST batch — payload completo:', { data: seccionesNuevas })
-
         const respPost = await guardarSeccionesBatch(seccionesNuevas)
-        resultados.push(respPost)
-
-        devLog('GUARD', 'Respuesta POST batch recibida:', respPost)
+        resultados.push({ tipo: 'POST', respuesta: respPost })
+        devLog('GUARD', 'POST completado:', respPost)
       }
 
-      devLog('GUARD', 'Guardado completo — todos los resultados:', resultados)
+      devLog('GUARD', 'Guardado completo:', resultados)
       setResultado(resultados)
       return resultados
 
@@ -233,7 +225,7 @@ export function useGuardarBoletin() {
         || err.response?.data?.error
         || err.message
         || 'Error desconocido al guardar'
-      devLog('GUARD', `❌ Error al guardar: ${msg}`)
+      devLog('GUARD', `Error: ${msg}`)
       setError(msg)
       throw err
     } finally {
@@ -241,32 +233,7 @@ export function useGuardarBoletin() {
     }
   }, [])
 
-  // ── darDeBaja ─────────────────────────────────────────────────────
-  // Función separada para hacer baja lógica de una sección.
-  // No pasa por todo el proceso de tokenización — solo cambia el status.
-  //
-  // PARÁMETRO bdData: el objeto con los datos de la BD (viene de elem._bdId, etc.)
-  // Ejemplo: { section_id: 65, section_segment: 3, ... todos los campos ... }
-  const darDeBaja = useCallback(async (bdData, updatedBy = 'SISTEMA') => {
-    setCargando(true)
-    setError(null)
-    try {
-      const resp = await darDeBajaSeccion(bdData, updatedBy)
-      devLog('BAJA', `✅ Sección ${bdData.section_id} dada de baja`)
-      return resp
-    } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Error al dar de baja'
-      setError(msg)
-      throw err
-    } finally {
-      setCargando(false)
-    }
-  }, [])
+  const limpiar = useCallback(() => { setError(null); setResultado(null) }, [])
 
-  const limpiar = useCallback(() => {
-    setError(null)
-    setResultado(null)
-  }, [])
-
-  return { guardar, darDeBaja, cargando, error, resultado, limpiar }
+  return { guardar, cargando, error, resultado, limpiar }
 }

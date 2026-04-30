@@ -1,32 +1,28 @@
 // ─────────────────────────────────────────────────────────────────────────
-// components/RutaGuardar.jsx
+// RutaGuardar.jsx  — Decide si mostrar el Builder (crear) o Editor (editar)
 // ─────────────────────────────────────────────────────────────────────────
 //
-// ¿QUÉ HACE ESTE COMPONENTE?
-//   Cuando el usuario abre http://localhost:5173/documento/guardar/2:
+// ¿CUÁNDO SE USA?
+//   Cuando el usuario abre: http://localhost:5173/documento/guardar/2
 //
-//   1. Llama a GET /bulletin/sections/2
+// ¿QUÉ HACE?
+//   1. Lee el "2" de la URL (es el bull_id)
+//   2. Llama a GET /bulletin/sections/2
+//   3a. Si el servidor responde 404 → el boletín no tiene secciones todavía
+//       → Muestra BuilderConId (builder vacío para crear contenido nuevo)
+//   3b. Si el servidor responde 200 con datos → el boletín ya tiene secciones
+//       → Muestra EditorConDatos (editor con las secciones ya cargadas)
+//   3c. Si hay otro error → muestra pantalla de error con mensaje descriptivo
 //
-//   2. Si responde 404 (no hay secciones):
-//      → Muestra el BUILDER VACÍO para crear el documento desde cero
-//        (como si el usuario hubiera abierto el builder normal)
-//        El bull_id 2 ya está pre-configurado para guardar en ese boletín.
+// ¿POR QUÉ ESTE COMPONENTE Y NO MODIFICAR App.jsx?
+//   App.jsx maneja el builder "genérico" sin un bull_id específico.
+//   Este componente es para cuando la URL ya trae el ID específico del boletín.
+//   Separar responsabilidades hace el código más fácil de mantener.
 //
-//   3. Si responde 200 con datos:
-//      → Muestra el EDITOR con las secciones cargadas
-//        (como si el usuario hubiera escrito "2" en el EditorBoletín
-//        y presionado "Cargar para editar")
-//
-// ¿POR QUÉ ESTE ENFOQUE?
-//   Centraliza la lógica de "¿existe este boletín?" en un solo lugar.
-//   Los componentes App y EditorBoletín no necesitan saber de dónde viene
-//   el bull_id — solo reciben los datos listos.
-//
-// ESTADOS DE ESTE COMPONENTE:
-//   'cargando'  → haciendo la llamada a la API, mostramos spinner
-//   'builder'   → 404, mostrar builder vacío para crear
-//   'editor'    → 200, mostrar editor con datos cargados
-//   'error'     → error inesperado (500, red caída, etc.)
+// CORRECCIÓN EN ESTA VERSIÓN:
+//   El TOKEN estaba hardcodeado aquí. Ahora se importa de api.js.
+//   Cualquier componente que necesite hacer fetch() debe importar
+//   { TOKEN, BASE_URL } de services/api.js.
 //
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -35,93 +31,116 @@ import { useParams, useNavigate } from 'react-router-dom'
 import BuilderConId               from './BuilderConId'
 import EditorConDatos             from './EditorConDatos'
 
-// TOKEN y BASE_URL — idealmente vendrían de import.meta.env
-// pero los leemos igual que en los otros componentes del proyecto
-const TOKEN    = import.meta.env.VITE_API_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJtaWxsYSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc3NzUwODI0NCwiZXhwIjoxNzc3NTM3MDQ0fQ.naEZDKTjT6nvk2iLu0ZTkMbbHpNKKrtgS7S_y3YlK0k'
-const BASE_URL = import.meta.env.VITE_API_URL   || 'http://localhost:3001'
+// Importar TOKEN y BASE_URL del servicio centralizado
+// NO hardcodear aquí — si el token expira solo cambias .env
+import { TOKEN, BASE_URL } from '../services/api'
 
 export default function RutaGuardar() {
+  // useParams(): lee los parámetros dinámicos de la URL
+  // Con la ruta "/documento/guardar/:id", si la URL es /documento/guardar/2
+  // entonces params.id === "2" (siempre es string, por eso parseamos a int abajo)
   const { id }   = useParams()
   const navigate = useNavigate()
 
-  // Estado de la pantalla: qué mostrar
-  // 'cargando' | 'builder' | 'editor' | 'error'
-  const [modo, setModo]         = useState('cargando')
-  const [secciones, setSecciones] = useState([])   // datos cuando hay 200
-  const [errorMsg, setErrorMsg]   = useState('')
+  // Estado de la pantalla
+  // 'cargando'  → haciendo la llamada a la API, mostramos spinner
+  // 'builder'   → 404, mostrar builder vacío (crear documento)
+  // 'editor'    → 200, mostrar editor con datos cargados (editar documento)
+  // 'error'     → algo salió mal (network error, 500, ID inválido, etc.)
+  const [modo,     setModo]     = useState('cargando')
+  const [secciones, setSecciones] = useState([])
+  const [errorMsg,  setErrorMsg]  = useState('')
 
+  // Convertir el id de string a número entero
+  // parseInt("2", 10) → 2  (el 10 indica base decimal)
   const bullId = parseInt(id, 10)
 
-  useEffect(() => {
-    // Si el ID no es válido, no intentar la llamada
-    if (!bullId || bullId <= 0) {
-      setErrorMsg('ID de boletín inválido en la URL.')
+  // useEffect: se ejecuta una vez cuando el componente se monta
+  // El array [bullId] como dependencias significa:
+  //   "ejecutar este efecto cuando bullId cambie"
+  //   (en la práctica no cambia porque la URL no cambia mientras estás aquí)
+  useEffect(function() {
+    // Validar que el ID sea un número válido
+    if (!bullId || bullId <= 0 || isNaN(bullId)) {
+      setErrorMsg('El ID en la URL no es válido. Debe ser un número entero mayor a 0. Ejemplo: /documento/guardar/2')
       setModo('error')
       return
     }
 
-    // Llamar a la API para verificar si el boletín tiene secciones
-    // Esta es la misma llamada que hace EditorBoletín cuando el usuario
-    // escribe el ID y presiona "Cargar para editar"
-    const verificar = async () => {
-      console.log(`[RutaGuardar] Verificando boletín ${bullId}...`)
+    // Función async interna para poder usar await dentro del useEffect
+    // (useEffect no puede ser async directamente)
+    async function verificar() {
+      console.log('[RutaGuardar] Verificando boletín', bullId)
 
       try {
-        const res = await fetch(`${BASE_URL}/bulletin/sections/${bullId}`, {
+        const res = await fetch(BASE_URL + '/bulletin/sections/' + bullId, {
           headers: {
-            'Authorization': `Bearer ${TOKEN}`,
+            'Authorization': 'Bearer ' + TOKEN,
             'accept': '*/*',
           },
         })
 
         if (res.status === 404) {
-          // 404 = No hay secciones → mostrar builder vacío para crear
-          console.log(`[RutaGuardar] Boletín ${bullId}: no tiene secciones → modo builder (crear)`)
+          // El boletín existe pero no tiene secciones → mostrar builder vacío
+          console.log('[RutaGuardar] Boletín ' + bullId + ': 404 → modo crear (builder vacío)')
           setModo('builder')
           return
         }
 
-        if (!res.ok) {
-          // Otro error HTTP
-          const texto = await res.text()
-          throw new Error(`Error ${res.status}: ${texto}`)
+        if (res.status === 401) {
+          throw new Error('Token expirado o inválido. Actualiza VITE_API_TOKEN en el archivo .env')
         }
 
-        // 200 = Hay secciones → cargar en el editor
-        const data = await res.json()
+        if (res.status === 403) {
+          throw new Error('No tienes permisos para acceder al boletín ' + bullId)
+        }
+
+        if (!res.ok) {
+          throw new Error('Error del servidor: ' + res.status + ' ' + res.statusText)
+        }
+
+        // 200 OK → hay secciones → mostrar editor con datos
+        const data  = await res.json()
         const lista = Array.isArray(data) ? data : (data.data || [])
 
-        console.log(`[RutaGuardar] Boletín ${bullId}: ${lista.length} secciones → modo editor (editar)`)
-        setSecciones(lista)
-        setModo('editor')
+        if (lista.length === 0) {
+          // La API respondió 200 pero sin datos → tratar como builder vacío
+          console.log('[RutaGuardar] Boletín ' + bullId + ': 200 pero sin secciones → modo crear')
+          setModo('builder')
+        } else {
+          console.log('[RutaGuardar] Boletín ' + bullId + ': ' + lista.length + ' secciones → modo editar')
+          setSecciones(lista)
+          setModo('editor')
+        }
 
       } catch (err) {
-        // Error de red o error inesperado
+        // Capturar errores de red (sin conexión) y otros errores inesperados
         console.error('[RutaGuardar] Error al verificar:', err)
-        setErrorMsg(err.message || 'No se pudo conectar con el servidor.')
+        setErrorMsg(
+          err.message ||
+          'No se pudo conectar con el servidor. Verifica que el backend está corriendo en ' + BASE_URL
+        )
         setModo('error')
       }
     }
 
     verificar()
-
-    // El array vacío [] significa: ejecutar este efecto solo una vez,
-    // cuando el componente se monta por primera vez.
-    // En Java sería como un método @PostConstruct.
-  }, [bullId])  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bullId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Pantalla de carga ─────────────────────────────────────────────
   if (modo === 'cargando') {
     return (
       <div style={{
-        minHeight: '100vh', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        background: '#faf8f5', fontFamily: "'Noto Sans', sans-serif",
-        gap: '16px',
+        minHeight:'100vh', display:'flex', flexDirection:'column',
+        alignItems:'center', justifyContent:'center',
+        background:'#faf8f5', fontFamily:"'Noto Sans',sans-serif", gap:'16px',
       }}>
-        <div style={{ fontSize: '48px', animation: 'spin 1s linear infinite' }}>⏳</div>
-        <p style={{ color: '#611232', fontWeight: 700, fontSize: '16px' }}>
+        <div style={{ fontSize:'48px', animation:'spin 1.2s linear infinite' }}>⏳</div>
+        <p style={{ color:'#611232', fontWeight:700, fontSize:'16px', margin:0 }}>
           Verificando boletín #{bullId}...
+        </p>
+        <p style={{ color:'#aaa', fontSize:'13px', margin:0 }}>
+          Consultando si ya tiene contenido guardado
         </p>
         <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
       </div>
@@ -132,25 +151,28 @@ export default function RutaGuardar() {
   if (modo === 'error') {
     return (
       <div style={{
-        minHeight: '100vh', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        background: '#faf8f5', fontFamily: "'Noto Sans', sans-serif",
-        gap: '16px', padding: '24px',
+        minHeight:'100vh', display:'flex', flexDirection:'column',
+        alignItems:'center', justifyContent:'center',
+        background:'#faf8f5', fontFamily:"'Noto Sans',sans-serif",
+        gap:'16px', padding:'24px',
       }}>
-        <div style={{ fontSize: '48px' }}>❌</div>
-        <h2 style={{ color: '#611232', fontFamily: 'Georgia,serif', margin: 0 }}>
+        <div style={{ fontSize:'48px' }}>❌</div>
+        <h2 style={{ color:'#611232', fontFamily:'Georgia,serif', margin:0, textAlign:'center' }}>
           No se pudo cargar el boletín
         </h2>
-        <p style={{ color: '#666', margin: 0, textAlign: 'center', maxWidth: '400px' }}>
+        <div style={{
+          background:'#fdf0f0', border:'1.5px solid #e8a0a0', borderRadius:'10px',
+          padding:'16px 20px', maxWidth:'480px', width:'100%',
+          color:'#8b2020', fontSize:'14px', lineHeight:1.6,
+        }}>
           {errorMsg}
-        </p>
+        </div>
         <button
-          onClick={() => navigate('/')}
+          onClick={function() { navigate('/') }}
           style={{
-            background: '#611232', color: '#fff', border: 'none',
-            borderRadius: '8px', padding: '10px 24px',
-            fontSize: '14px', fontWeight: 700, cursor: 'pointer',
-            fontFamily: 'inherit',
+            background:'#611232', color:'#fff', border:'none',
+            borderRadius:'8px', padding:'10px 24px',
+            fontSize:'14px', fontWeight:700, cursor:'pointer', fontFamily:'inherit',
           }}
         >
           ← Ir al Builder
@@ -160,25 +182,22 @@ export default function RutaGuardar() {
   }
 
   // ── Modo builder: crear documento nuevo ──────────────────────────
-  // 404 → el boletín existe pero no tiene secciones todavía
-  // Mostramos el builder normal con el bull_id pre-configurado
   if (modo === 'builder') {
     return (
       <BuilderConId
         bullId={bullId}
-        onVolver={() => navigate('/')}
+        onVolver={function() { navigate('/') }}
       />
     )
   }
 
   // ── Modo editor: editar documento existente ──────────────────────
-  // 200 → hay secciones, las cargamos en el editor
   if (modo === 'editor') {
     return (
       <EditorConDatos
         bullId={bullId}
         seccionesIniciales={secciones}
-        onVolver={() => navigate('/')}
+        onVolver={function() { navigate('/') }}
       />
     )
   }

@@ -59,13 +59,20 @@ const eid = (id) => String(id).replace(/'/g, "\\'")
 
 // ── renderElem: ahora envuelve cada elemento en un div con data-elem-id ──
 function renderElem(elem, secId, subId) {
-  const { tipo, contenido, html, align, _fileUrl, id } = elem
-  const as = align ? `text-align:${align}` : ''
-  const v  = html || contenido || ''
-  const empty = `<em style="color:#ccc;font-size:11px">(vacío)</em>`
-  const d = v || empty
+  const { tipo, contenido, html, align, _fileUrl, id, font } = elem
 
-  // Atributos de navegación: secId y subId opcionales (para columnas)
+  // CORRECCIÓN: aplicar font-family en el preview según elem.font
+  // ANTES: elem.font se ignoraba → la fuente nunca cambiaba en el preview
+  // AHORA: se mapea 'noto-sans' y 'patria' a sus font-family CSS reales
+  const FONT_MAP = { 'noto-sans': '"Noto Sans",sans-serif', 'patria': 'Georgia,serif' }
+  const fontCss  = (font && FONT_MAP[font]) ? `font-family:${FONT_MAP[font]};` : ''
+  const as       = align ? `text-align:${align};` : ''
+  const inlineStyle = as + fontCss  // combinar alineación + fuente
+
+  const v     = html || contenido || ''
+  const empty = `<em style="color:#ccc;font-size:11px">(vacío)</em>`
+  const d     = v || empty
+
   const secAttr = secId ? ` data-pv-sec-id="${eid(secId)}"` : ''
   const subAttr = subId ? ` data-sub-id="${eid(subId)}"` : ''
   const wrapOpen  = `<div class="pv-elem-wrap" data-elem-id="${eid(id)}"${secAttr}${subAttr}>`
@@ -73,15 +80,15 @@ function renderElem(elem, secId, subId) {
 
   let inner = ''
   switch (tipo) {
-    case 'h1':   inner = `<h1 class="doc-h1" style="${as}">${d}</h1>`; break
-    case 'h2':   inner = `<h2 class="doc-h2" style="${as}">${d}</h2>`; break
-    case 'h3':   inner = `<h3 class="doc-h3" style="${as}">${d}</h3>`; break
-    case 'p':    inner = `<p class="doc-p" style="${as}">${d}</p>`; break
-    case 'hl':   inner = `<div class="doc-highlight" style="display:flex;gap:8px;align-items:flex-start;${as}"><span style="font-size:16px;flex-shrink:0;line-height:1.4">⚠</span><div style="flex:1">${d}</div></div>`; break
-    case 'note': inner = `<blockquote class="doc-note" style="${as}">${d}</blockquote>`; break
+    // inlineStyle incluye text-align + font-family
+    case 'h1':   inner = `<h1 class="doc-h1" style="${inlineStyle}">${d}</h1>`; break
+    case 'h2':   inner = `<h2 class="doc-h2" style="${inlineStyle}">${d}</h2>`; break
+    case 'h3':   inner = `<h3 class="doc-h3" style="${inlineStyle}">${d}</h3>`; break
+    case 'p':    inner = `<p class="doc-p" style="${inlineStyle}">${d}</p>`; break
+    case 'hl':   inner = `<div class="doc-highlight" style="display:flex;gap:8px;align-items:flex-start;${inlineStyle}"><span style="font-size:16px;flex-shrink:0;line-height:1.4">⚠</span><div style="flex:1">${d}</div></div>`; break
+    case 'note': inner = `<blockquote class="doc-note" style="${inlineStyle}">${d}</blockquote>`; break
     case 'hr':   inner = `<hr class="doc-hr">`; break
     case 'url': {
-      // Si tiene anchorText (texto visible del link), mostrarlo en lugar de la URL
       const textoUrl = elem.anchorText || contenido || empty
       inner = `<div style="${as}"><a class="doc-url" href="#">${textoUrl}</a></div>`
       break
@@ -96,7 +103,7 @@ function renderElem(elem, secId, subId) {
       else if (contenido) inner = `<div style="background:#f5e8d0;border:1.5px dashed #c9a76c;border-radius:6px;padding:10px;font-size:12px;color:#7b5800;text-align:center">🖼 ${contenido}</div>`
       else inner = `<div style="background:#f5f5f5;border:1.5px dashed #ccc;border-radius:6px;padding:10px;font-size:11px;color:#aaa;text-align:center">📷 imagen</div>`
       break
-    default: inner = `<div style="${as}">${d}</div>`
+    default: inner = `<div style="${inlineStyle}">${d}</div>`
   }
 
   return wrapOpen + inner + wrapClose

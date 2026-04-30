@@ -33,7 +33,7 @@ import { useState, useEffect }   from 'react'
 import { decodeCssFromIndex }    from '../utils/cssTokens'
 import { decodeHtml }            from '../utils/htmlTokens'
 
-const TOKEN    = import.meta.env.VITE_API_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJtaWxsYSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc3NzUwODI0NCwiZXhwIjoxNzc3NTM3MDQ0fQ.naEZDKTjT6nvk2iLu0ZTkMbbHpNKKrtgS7S_y3YlK0k'
+const TOKEN    = import.meta.env.VITE_API_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJtaWxsYSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc3NzU2NjIxMSwiZXhwIjoxNzc3NTk1MDExfQ.zDQIBM_umyL1iYy6rWukbvVmm9LRD3WdnXtD2Y2pUR4'
 const BASE_URL = import.meta.env.VITE_API_URL   || 'http://localhost:3001'
 
 // ── Copiar DOC_STYLES y renderSeccion y construirHtmlDocumento de VisorDocumento
@@ -173,7 +173,7 @@ export default function VisorDocumentoDirecto({ bullId, onVolver }) {
         }
         if (!res.ok) {
           if (res.status === 401) throw new Error('Token expirado. Actualiza VITE_API_TOKEN en .env')
-          throw new Error(`Error del servidor: ${res.status}`)
+          throw new Error(`Error del servidor: ${res.json().message || res.statusText}`)
         }
 
         const data = await res.json()

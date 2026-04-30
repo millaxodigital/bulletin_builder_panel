@@ -1,27 +1,16 @@
-/* ─────────────────────────────────────────────────────────
-   App.css — v2  (responsive completo con toggle de panel móvil)
-   ─────────────────────────────────────────────────────────
-   CAMBIOS:
-   1. .panel-oculto-movil: oculta un panel en móvil (< 768px)
-   2. Botón toggle "Ver Preview / Ver Builder" en FloatingToolbar
-   3. Media query 768px (antes era 900px)
-   4. Animación de transición entre paneles
-   ─────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────
+   App.css — Estilos globales del layout principal
+   ─────────────────────────────────────────────────────────────────────
+   NUEVO: .panel-oculto-movil → oculta un panel en móvil (≤ 768px)
+   Usado por App.jsx y EditorBoletín.jsx para alternar paneles en móvil.
+   ───────────────────────────────────────────────────────────────────── */
 
-/* Reset base */
 *, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; padding: 0; font-family: 'Noto Sans', sans-serif; background: #f0ece8; }
 
-body {
-  margin: 0;
-  padding: 0;
-  font-family: 'Noto Sans', sans-serif;
-  background: #f0ece8;
-}
-
-/* ══════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════════════
    DESKTOP (> 768px): dos paneles lado a lado
-   Builder 57% izquierda | Preview 43% derecha
-   ══════════════════════════════════════════════════════ */
+   ══════════════════════════════════════════════════════════════════════ */
 .app-layout {
   display: flex;
   width: 100vw;
@@ -29,97 +18,47 @@ body {
   overflow: hidden;
 }
 
-/* Panel del builder — scroll independiente */
+/* Panel builder — 57% izquierda, scroll independiente */
 .app-builder {
   width: 57%;
   height: 100vh;
   overflow-y: auto;
   overflow-x: hidden;
   flex-shrink: 0;
-  transition: opacity 0.2s ease;
 }
 .app-builder::-webkit-scrollbar { width: 6px; }
 .app-builder::-webkit-scrollbar-track { background: #f0ece8; }
 .app-builder::-webkit-scrollbar-thumb { background: #c9a76c; border-radius: 10px; }
 
-/* Panel del preview — scroll independiente */
+/* Panel preview — el resto del espacio, sin scroll propio */
 .app-preview {
   flex: 1;
   height: 100vh;
   overflow: hidden;
-  transition: opacity 0.2s ease;
 }
 
-/* ══════════════════════════════════════════════════════
-   MÓVIL (≤ 768px): UN PANEL A LA VEZ
-   ══════════════════════════════════════════════════════
-   ANTES: los dos paneles se apilaban verticalmente,
-          quedaba muy pequeño y difícil de usar.
-   AHORA: solo se muestra UN panel a la vez.
-          El botón flotante permite cambiar entre ellos.
-          Es exactamente como funciona VS Code en móvil
-          (o el inspector de Chrome en modo responsive).
+/* ── Clase para ocultar un panel en móvil ─────────────────────────────
+   EXPLICACIÓN:
+   En desktop los dos paneles siempre están visibles lado a lado.
+   En móvil (≤ 768px) solo cabe un panel a la vez.
+   El botón "Preview/Builder" del toolbar alterna cuál panel se muestra.
+   App.jsx aplica esta clase al panel que NO está activo:
 
-   .panel-oculto-movil: clase que se aplica al panel
-   que NO está activo. Usa display:none en móvil.
-   En desktop esta clase no tiene efecto.
-   ══════════════════════════════════════════════════════ */
-@media (max-width: 768px) {
-  body {
-    overflow-x: hidden;
-  }
+     <div className={`app-builder${panelMovil !== 'builder' ? ' panel-oculto-movil' : ''}`}>
 
-  .app-layout {
-    flex-direction: column;
-    height: 100vh;
-    overflow: hidden;
-  }
+   En desktop esta clase no tiene efecto (el media query no aplica).
+   En móvil oculta el panel con display:none.
+   display:none quita el elemento del flujo — el panel activo ocupa todo.
 
-  /* Cada panel ocupa toda la pantalla en móvil */
-  .app-builder,
-  .app-preview {
-    width: 100%;
-    height: 100vh;
-    overflow-y: auto;
-    flex-shrink: 0;
-  }
+   IMPORTANTE: display:none → el elemento existe en el DOM pero
+   es completamente invisible e inaccesible. No ocupa espacio.
+   Es diferente a visibility:hidden que sí ocupa espacio.
+   ─────────────────────────────────────────────────────────────────── */
+/* En desktop: .panel-oculto-movil no hace nada (no hay media query aquí) */
+/* Aplica en el @media de abajo */
 
-  /* El panel que NO está activo se oculta completamente.
-     display:none quita el elemento del flujo del DOM,
-     así el panel activo ocupa toda la pantalla.
-     La transición de opacidad antes del display:none
-     hace la animación más suave. */
-  .panel-oculto-movil {
-    display: none !important;
-  }
-
-  /* Espacio inferior para que el toolbar flotante no tape el contenido */
-  .app-builder { padding-bottom: 90px; }
-}
-
-/* ══════════════════════════════════════════════════════
-   TABLET (769px – 900px): paneles apilados verticalmente
-   ══════════════════════════════════════════════════════ */
-@media (min-width: 769px) and (max-width: 900px) {
-  body { overflow-y: auto; overflow-x: hidden; }
-  .app-layout  { flex-direction: column; height: auto; overflow: visible; width: 100%; }
-  .app-builder { width: 100%; height: auto; overflow: visible; padding-bottom: 80px; }
-  .app-preview { height: 420px; width: 100%; overflow: hidden; }
-
-  /* En tablet no aplica el panel-oculto-movil */
-  .panel-oculto-movil { display: block !important; }
-}
-
-/* ══════════════════════════════════════════════════════
-   TELÉFONO PEQUEÑO (≤ 480px)
-   ══════════════════════════════════════════════════════ */
-@media (max-width: 480px) {
-  .app-builder { padding-bottom: 90px; }
-}
-
-/* ══════════════════════════════════════════════════════
-   EDITOR DE BOLETINES — compensar barra superior fija
-   ══════════════════════════════════════════════════════ */
+/* ── Variante para el editor de boletines (tiene barra superior fija) */
+/* La barra superior de EditorBoletín tiene 34px de alto */
 .app-builder-editor {
   margin-top: 34px;
   height: calc(100vh - 34px);
@@ -129,11 +68,50 @@ body {
   height: calc(100vh - 34px);
 }
 
-@media (max-width: 900px) {
+/* ══════════════════════════════════════════════════════════════════════
+   TABLET (769px – 900px): paneles apilados verticalmente
+   En tablet el espacio es limitado, así que los paneles se apilan.
+   ══════════════════════════════════════════════════════════════════════ */
+@media (min-width: 769px) and (max-width: 900px) {
+  body { overflow-y: auto; overflow-x: hidden; }
+  .app-layout  { flex-direction: column; height: auto; overflow: visible; width: 100%; }
+  .app-builder { width: 100%; height: auto; overflow: visible; padding-bottom: 80px; }
+  .app-preview { height: 420px; width: 100%; overflow: hidden; }
   .app-builder-editor { height: auto; padding-bottom: 114px; }
-  .app-preview-editor { height: 420px; margin-top: 0; }
+  .app-preview-editor { height: 420px; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   MÓVIL (≤ 768px): UN PANEL A LA VEZ
+   ══════════════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
+  body { overflow-x: hidden; }
+
+  .app-layout {
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* En móvil, cada panel ocupa toda la pantalla */
+  .app-builder,
+  .app-preview {
+    width: 100%;
+    height: 100vh;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+
+  /* .panel-oculto-movil: oculta el panel que no está activo.
+     El !important asegura que sobreescriba cualquier otro estilo. */
+  .panel-oculto-movil {
+    display: none !important;
+  }
+
+  /* Espacio para el toolbar flotante */
+  .app-builder { padding-bottom: 90px; }
+
+  /* Compensar la barra superior en el editor */
   .app-builder-editor,
   .app-preview-editor {
     margin-top: 0;
@@ -141,7 +119,12 @@ body {
     padding-bottom: 90px;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   TELÉFONO PEQUEÑO (≤ 480px)
+   ══════════════════════════════════════════════════════════════════════ */
 @media (max-width: 480px) {
+  .app-builder { padding-bottom: 90px; }
   .app-builder-editor,
   .app-preview-editor { padding-bottom: 90px; }
 }

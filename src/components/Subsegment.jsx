@@ -173,12 +173,12 @@ export default function Subsegment({
       {isOpen && (
         <div className={styles.subBody}>
           {/* Nombre de la columna */}
-          <div className={styles.campo}>
+          {/* <div className={styles.campo}>
             <label>Nombre de la columna</label>
             <input type="text" value={sub.nombre || ''}
               placeholder={`Columna ${subIndex + 1}`}
               onChange={e => onUpdate(sub.id, { ...sub, nombre: e.target.value })} />
-          </div>
+          </div> */}
 
           {/* Lista de elementos con acordeón */}
           <div className={styles.elemLista}>

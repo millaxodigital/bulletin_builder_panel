@@ -1,20 +1,25 @@
-/* FloatingToolbar.module.css — v3
-   NUEVO: .fabTogglePanel — visible solo en móvil (≤ 768px)
-*/
+/* ─────────────────────────────────────────────────────────────────────
+   FloatingToolbar.module.css
+   ─────────────────────────────────────────────────────────────────────
+   Los archivos .module.css en React tienen "CSS Modules":
+   los nombres de clase se convierten en únicos automáticamente
+   (ej: .fab → .fab_abc123) para no colisionar con otros estilos.
+   Se usan como: className={styles.fab}, className={styles.fabBtn}
+   ───────────────────────────────────────────────────────────────────── */
 
-/* ── Estado EXPANDIDO (normal) ── */
+/* ── Contenedor principal (desktop, expandido) ────────────────────── */
 .fab {
-  position: fixed;
-  left: 57%;
+  position: fixed;             /* no se mueve al hacer scroll */
+  left: 57%;                   /* borde entre los dos paneles */
   top: 50%;
   transform: translate(-50%, -50%);
-  z-index: 500;
+  z-index: 500;                /* encima del contenido */
   display: flex;
-  flex-direction: column;
+  flex-direction: column;      /* botones apilados verticalmente */
   align-items: center;
   gap: 2px;
-  background: #611232;
-  border: 2px solid #a57f2c;
+  background: #611232;         /* guinda institucional */
+  border: 2px solid #a57f2c;   /* dorado institucional */
   border-radius: 18px;
   padding: 10px 6px;
   box-shadow: 0 6px 28px rgba(97,18,50,.5), 0 2px 6px rgba(0,0,0,.3);
@@ -22,34 +27,38 @@
   transition: padding 0.2s, border-radius 0.2s;
 }
 
-/* ── Estado COLAPSADO ── */
+/* ── Estado colapsado: se minimiza a un botón pequeño ─────────────── */
 .fabColapsado {
   padding: 8px 6px;
-  border-radius: 100px;
+  border-radius: 100px; /* se vuelve circular */
   gap: 0;
 }
 
-/* ── Botón toggle (siempre visible) ── */
+/* ── Botón toggle (colapsar/expandir) ─────────────────────────────── */
 .fabToggle {
   color: rgba(230,209,148,.7);
   padding: 6px 10px;
   min-width: 40px;
   gap: 4px;
-  flex-direction: row;
+  flex-direction: row; /* ícono + contador en fila horizontal */
 }
 .fabToggle:hover:not(:disabled) {
   color: #e6d194;
   background: rgba(230,209,148,.15) !important;
 }
 
-/* ── NUEVO: Botón toggle builder/preview ──────────────────────────────
-   En desktop (> 768px): OCULTO — los dos paneles siempre son visibles.
-   En móvil (≤ 768px): VISIBLE — permite cambiar entre paneles.
-   Usa un color dorado más brillante para distinguirlo visualmente.
+/* ── Botón "Preview/Builder" — OCULTO EN DESKTOP ──────────────────────
+   REGLA IMPORTANTE:
+   display: none aquí = oculto en desktop (pantallas > 768px)
+   En el @media (max-width: 768px) de abajo se cambia a display: flex
+   para hacerlo visible SOLO en móvil.
+
+   ¿Por qué usar CSS en lugar de JS para esto?
+   CSS es más eficiente. Con JS necesitarías window.innerWidth y
+   un event listener al resize. Con CSS el browser lo maneja solo.
    ─────────────────────────────────────────────────────────────────── */
 .fabTogglePanel {
-  /* Por defecto oculto en desktop */
-  display: none;
+  display: none;  /* OCULTO por defecto (desktop) */
   color: #e6d194;
   background: rgba(165,127,44,.2);
   border: 1px solid rgba(165,127,44,.4);
@@ -64,7 +73,7 @@
   background: rgba(165,127,44,.35) !important;
 }
 
-/* Contador inline dentro del toggle */
+/* ── Contador de secciones dentro del botón toggle ────────────────── */
 .counterInline {
   font-size: 11px;
   font-weight: 900;
@@ -80,10 +89,10 @@
   padding: 0 5px;
 }
 
-/* ── Botones de acción ── */
+/* ── Estilos comunes de todos los botones ─────────────────────────── */
 .fabBtn {
   display: flex;
-  flex-direction: column;
+  flex-direction: column; /* ícono arriba, label abajo */
   align-items: center;
   gap: 4px;
   background: transparent;
@@ -101,8 +110,12 @@
   transform: scale(1.07);
 }
 .fabBtn:active:not(:disabled) { transform: scale(0.97); }
-.fabBtn:disabled { opacity: 0.35; cursor: default; }
+.fabBtn:disabled {
+  opacity: 0.35;
+  cursor: default; /* indica que no se puede hacer clic */
+}
 
+/* ── Label de texto debajo del ícono ─────────────────────────────── */
 .fabLabel {
   font-size: 9px;
   font-weight: 700;
@@ -111,57 +124,68 @@
   color: #e6d194;
 }
 
+/* ── Estado cargando (mientras guarda en la API) ─────────────────── */
 .fabCargando { color: #9b6677; }
 .fabCargando .fabLabel { color: #9b6677; }
 
-/* ── Separador ── */
+/* ── Separador visual entre grupos de botones ────────────────────── */
 .sep {
-  width: 36px; height: 1px;
+  width: 36px;
+  height: 1px;
   background: rgba(165,127,44,.35);
   margin: 3px 0;
 }
 
-/* ── Animación de carga ── */
+/* ── Animación del spinner de carga ──────────────────────────────── */
 .spin { animation: fab-spin 1s linear infinite; }
-@keyframes fab-spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+@keyframes fab-spin {
+  from { transform: rotate(0deg)   }
+  to   { transform: rotate(360deg) }
+}
 
-/* ══════════════════════════════════════════════════════
-   TABLET/MÓVIL (≤ 900px): barra horizontal en el fondo
-   ══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════
+   TABLET (≤ 900px): barra horizontal en la parte inferior
+   En tablet hay menos espacio vertical, así que la barra se voltea
+   y se posiciona en la parte inferior de la pantalla.
+   ══════════════════════════════════════════════════════════════════════ */
 @media (max-width: 900px) {
   .fab {
-    left: 50%; top: auto; bottom: 16px;
+    left: 50%;
+    top: auto;
+    bottom: 16px;              /* fijo en la parte inferior */
     transform: translateX(-50%);
-    flex-direction: row;
-    border-radius: 100px;
+    flex-direction: row;       /* botones en fila horizontal */
+    border-radius: 100px;      /* forma de píldora */
     padding: 8px 16px;
     gap: 0;
   }
   .fabColapsado { padding: 8px 14px; }
-  .sep { width: 1px; height: 34px; margin: 0 4px; }
+  .sep { width: 1px; height: 34px; margin: 0 4px; } /* separador vertical */
   .fabBtn { min-width: 48px; padding: 8px 10px; }
   .fabLabel { font-size: 8px; }
   .fabToggle { flex-direction: row; }
 }
 
-/* ══════════════════════════════════════════════════════
-   MÓVIL (≤ 768px): mostrar el botón de toggle de panel
-   ══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════
+   MÓVIL (≤ 768px): ACTIVAR el botón "Preview/Builder"
+   Este es el media query donde el botón se hace visible.
+   En desktop estaba oculto con display:none — aquí se activa.
+   ══════════════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  /* Mostrar el botón que en desktop estaba oculto */
+  /* Activar el botón que estaba oculto en desktop */
   .fabTogglePanel {
-    display: flex;  /* activar el botón */
+    display: flex; /* VISIBLE en móvil — antes era display:none */
   }
 }
 
-/* ══════════════════════════════════════════════════════
-   TELÉFONO PEQUEÑO (≤ 480px)
-   ══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════
+   TELÉFONO PEQUEÑO (≤ 480px): ajustes adicionales
+   ══════════════════════════════════════════════════════════════════════ */
 @media (max-width: 480px) {
   .fab { bottom: 10px; padding: 6px 12px; }
   .fabBtn { min-width: 40px; padding: 6px 8px; }
-  .fabLabel { display: none; }
+  .fabLabel { display: none; } /* ocultar labels de texto en pantallas muy pequeñas */
   .counterInline { min-width: 16px; height: 16px; font-size: 10px; }
-  /* En teléfonos muy pequeños mantener el label del toggle visible */
+  /* Exception: el label del toggle panel sí se muestra (para saber qué hace) */
   .fabTogglePanel .fabLabel { display: flex; }
 }
